@@ -303,7 +303,7 @@ const RULES = {
 
         const info = document.createElement("div");
         info.className = "note";
-        info.textContent = `추가 룰렛 대상: ${target}`;
+        info.textContent = `추가 룰렛 대상:`;
         stage2Wrap.appendChild(info);
 
         const stage2Group = createSlotRouletteGroup({
