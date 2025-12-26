@@ -514,7 +514,105 @@ const RULES = {
       });
       $extraArea.appendChild(g.card);
     }
+  },
+
+  "책임완수": {
+    desc: "돌리기 1번으로 파랑/빨강/보라/노랑에게 종/문(해군대장)/해왕류/룸바영혼을 중복 없이 1개씩 배정. 배정된 임무는 반드시 책임지고 클리어.",
+    build: () => {
+      const missions = ["종", "문(해군대장)", "해왕류", "룸바영혼"];
+      const cols = colors();
+
+      function shuffleCopy(arr){
+        const a = [...arr];
+        for (let i = a.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      async function spinToTarget(items, targetItem, { durationMs = SPIN_MS, minDelay = MIN_DELAY, maxDelay = MAX_DELAY, onTick } = {}){
+        if (!items || items.length === 0) return null;
+
+        const len = items.length;
+        const start = Math.floor(Math.random() * len);
+        const target = Math.max(0, items.indexOf(targetItem));
+
+        const baseTicks = Math.max(18, Math.min(60, Math.round(durationMs / 32)));
+        const toTarget = (target - start + len) % len;
+        const totalTicks = baseTicks + toTarget;
+
+        const delays = makeScaledDelays(totalTicks, durationMs, minDelay, maxDelay);
+
+        let idx = start;
+        for (let i=0; i<delays.length; i++){
+          idx = (idx + 1) % len;
+          onTick?.(items[idx]);
+          await sleep(delays[i]);
+        }
+        return items[idx];
+      }
+
+      const { card, body } = makeCard("책임완수", "한번에 1회로 4명 임무 배정(중복 없음)");
+
+      const btn = document.createElement("button");
+      btn.className = "btnSub";
+      btn.textContent = "임무 배정";
+
+      const row = document.createElement("div");
+      row.className = "btnRow";
+      row.appendChild(btn);
+
+      const grid = document.createElement("div");
+      grid.className = "slotGrid";
+
+      const valueEls = [];
+
+      cols.forEach((c) => {
+        const slot = document.createElement("div");
+        slot.className = "slot";
+
+        const top = document.createElement("div");
+        top.className = "slotTop";
+
+        const lab = document.createElement("div");
+        lab.className = "slotLabel";
+        lab.textContent = c;
+
+        const val = document.createElement("div");
+        val.className = "slotValue";
+        val.textContent = "—";
+
+        top.appendChild(lab);
+        slot.appendChild(top);
+        slot.appendChild(val);
+
+        grid.appendChild(slot);
+        valueEls.push(val);
+      });
+
+      btn.onclick = async () => {
+        btn.disabled = true;
+
+        const assigned = shuffleCopy(missions);
+
+        valueEls.forEach(v => v.classList.add("spinning"));
+
+        await Promise.all(valueEls.map((el, i) =>
+          spinToTarget(missions, assigned[i], { onTick: (t) => { el.textContent = t; } })
+        ));
+
+        valueEls.forEach(v => v.classList.remove("spinning"));
+        btn.disabled = false;
+      };
+
+      body.appendChild(row);
+      body.appendChild(grid);
+
+      $extraArea.appendChild(card);
+    }
   }
+
 
 };
 
