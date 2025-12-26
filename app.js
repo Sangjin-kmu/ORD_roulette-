@@ -10,6 +10,10 @@ const $chev = document.getElementById("chev");
 const $ruleListWrap = document.getElementById("ruleListWrap");
 const $ruleList = document.getElementById("ruleList");
 
+const $startScreen = document.getElementById("startScreen");
+const $startBtn = document.getElementById("startBtn");
+
+
 let MAIN_RULES = [];
 let HIGH_UNITS = [];
 let LEGEND_UNITS = [];
@@ -21,6 +25,8 @@ let CORSAIR = [];
 let mainLis = [];
 let mainIndex = 0;
 let isSpinningMain = false;
+let hasPickedMain = false;
+
 
 const SPIN_MS = 1500;
 const MIN_DELAY = 18;
@@ -534,9 +540,9 @@ function renderRuleList(){
 
   $ruleCount.textContent = String(MAIN_RULES.length);
 
-  mainIndex = Math.floor(Math.random() * MAIN_RULES.length);
-  setActiveRule(mainIndex);
-  $pickedRule.textContent = MAIN_RULES[mainIndex];
+  mainIndex = 0;
+  setActiveRule(-1);
+  $pickedRule.textContent = "룰을 뽑아주세요";
 }
 
 function toggleRuleList(){
@@ -552,7 +558,7 @@ function toggleRuleList(){
 
 async function spinMainRule(){
   if (isSpinningMain || MAIN_RULES.length === 0) return;
-
+  hasPickedMain = true;
   isSpinningMain = true;
   $spinMainBtn.disabled = true;
   $pickedRule.classList.add("spinning");
@@ -596,11 +602,12 @@ async function init(){
 
   renderRuleList();
 
-  const first = MAIN_RULES[mainIndex];
-  const def = RULES[first] ?? defaultRule(first);
-  $desc.textContent = def.desc;
-  def.build();
+  $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
+  clearExtra();
+  $startBtn.addEventListener("click", () => {
+  $startScreen.style.display = "none";
+});
+
 }
 
 init();
-
