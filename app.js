@@ -1,4 +1,3 @@
-
 const $pickedRule = document.getElementById("pickedRule");
 const $desc = document.getElementById("desc");
 const $extraArea = document.getElementById("extraArea");
@@ -21,8 +20,8 @@ let mainLis = [];
 let mainIndex = 0;
 let isSpinningMain = false;
 
-const SPIN_MS = 1500;   
-const MIN_DELAY = 18; 
+const SPIN_MS = 1500;
+const MIN_DELAY = 18;
 const MAX_DELAY = 180;
 
 function easeOutQuad(t){ return 1 - (1 - t) * (1 - t); }
@@ -101,7 +100,7 @@ function createSlotRouletteGroup({
   labels,
   items,
   uniqueWithinGroup = false,
-  onGroupChange 
+  onGroupChange
 }){
   const { card, body } = makeCard(title, sub);
 
@@ -175,6 +174,12 @@ function createSlotRouletteGroup({
 
 function colors(){ return ["빨강","파랑","보라","노랑"]; }
 
+const BANNED_HIGH_KEYWORDS = ["우타", "몽키 D. 루피(니카)", "마르코"];
+
+function getHighUnitsForRestrictedRules(){
+  return HIGH_UNITS.filter(u => !BANNED_HIGH_KEYWORDS.some(k => String(u).includes(k)));
+}
+
 const RULES = {
   "원딜전": {
     desc: "항법은 자유, 갈수있는 상위는 무조건 1개로 제한",
@@ -188,7 +193,7 @@ const RULES = {
         title: "상위 유닛 1개 뽑기",
         sub: "상위에서 1개",
         labels: ["상위 유닛"],
-        items: HIGH_UNITS,
+        items: getHighUnitsForRestrictedRules(),
         uniqueWithinGroup: false
       });
       $extraArea.appendChild(g.card);
@@ -203,7 +208,7 @@ const RULES = {
           title: `${name} 상위 유닛 2개`,
           sub: "팀 내부 중복 금지",
           labels: ["1번","2번"],
-          items: HIGH_UNITS,
+          items: getHighUnitsForRestrictedRules(),
           uniqueWithinGroup: true
         });
         $extraArea.appendChild(g.card);
@@ -244,7 +249,7 @@ const RULES = {
           }
           const letters = [a,b];
           const allowed = HIGH_UNITS.filter(u => letters.some(ch => String(u).includes(ch)));
-          allowedBox.textContent = allowed.length ? allowed.join(", ") : "해당 글자를 포함한 유닛이 없음(임시 데이터 가능)";
+          allowedBox.textContent = allowed.length ? allowed.join(", ") : "해당 글자를 포함한 유닛이 없음";
         }
 
         renderAllowed(values);
@@ -280,12 +285,9 @@ const RULES = {
       const stage2Wrap = document.createElement("div");
       stage2Card.appendChild(stage2Wrap);
 
-      let stage2Group = null;
-
       function updateStage2(vals){
         if (vals.some(v => v == null)) {
           stage2Wrap.innerHTML = "";
-          stage2Group = null;
           return;
         }
 
@@ -298,16 +300,15 @@ const RULES = {
           : candidates[Math.floor(Math.random() * candidates.length)];
 
         stage2Wrap.innerHTML = "";
+
         const info = document.createElement("div");
         info.className = "note";
-        info.textContent = candidates.length === 1
-          ? `제일 늦은 사람용`
-          : ``;
+        info.textContent = `추가 룰렛 대상: ${target}`;
         stage2Wrap.appendChild(info);
 
-        stage2Group = createSlotRouletteGroup({
+        const stage2Group = createSlotRouletteGroup({
           title: "추가 룰렛",
-          sub: `추가 룰렛 1회 돌리기`,
+          sub: "1~10 중 1회",
           labels: [target],
           items: nums2,
           uniqueWithinGroup: false
@@ -321,52 +322,73 @@ const RULES = {
   },
 
   "지츠다이스": {
-    desc: "상위 4개(중복 없이) 뽑고, 빨/파/보/노가 순서를 뽑아(중복 없이) 원하는 상위를 순서대로 가져감",
+    desc: "상위 4개(중복 없이, 밴 제외) 뽑고, 빨/파/보/노가 1~100 숫자를 뽑아 높은 사람부터 원하는 상위를 가져감",
     build: () => {
-      // 1) 상위 4개
       const stage1 = createSlotRouletteGroup({
         title: "1단계: 상위 4개 뽑기",
-        sub: "중복 없이 4개 (각 칸 따로 돌리기)",
+        sub: "중복 없이 4개 (밴 제외)",
         labels: ["상위1","상위2","상위3","상위4"],
-        items: HIGH_UNITS,
+        items: getHighUnitsForRestrictedRules(),
         uniqueWithinGroup: true,
         onGroupChange: (vals) => updateStage2(vals)
       });
       $extraArea.appendChild(stage1.card);
 
-      const { card: stage2Card } = makeCard("2단계: 순서 뽑기(1~4)", "1단계 4개가 모두 정해지면 진행");
+      const { card: stage2Card } = makeCard("2단계: 1~100 숫자 뽑기(4명)", "상위 4개가 모두 정해지면 진행");
       const stage2Wrap = document.createElement("div");
       stage2Card.appendChild(stage2Wrap);
+      stage2Wrap.innerHTML = "<div class='note'>—</div>";
+      $extraArea.appendChild(stage2Card);
 
-      function updateStage2(vals){
-        if (vals.some(v => v == null)) {
+      function updateStage2(pickedUnits){
+        if (pickedUnits.some(v => v == null)) {
           stage2Wrap.innerHTML = "<div class='note'>—</div>";
           return;
         }
 
         stage2Wrap.innerHTML = "";
-        const pickedUnits = vals;
-
-        const orderGroup = createSlotRouletteGroup({
-          title: "빨/파/보/노 순서",
-          sub: "1~4 중복 없이",
-          labels: colors(),
-          items: ["1","2","3","4"],
-          uniqueWithinGroup: true
-        });
-
-        stage2Wrap.appendChild(orderGroup.card);
 
         const hint = document.createElement("div");
         hint.className = "note";
-        hint.textContent = `뽑힌 상위 4개: ${pickedUnits.join(", ")} / 순서 1부터 원하는 상위를 선택해서 가져가면 됨`;
+        hint.textContent = `뽑힌 상위 4개: ${pickedUnits.join(", ")}`;
         stage2Wrap.appendChild(hint);
-      }
 
-      stage2Wrap.innerHTML = "<div class='note'>—</div>";
-      $extraArea.appendChild(stage2Card);
+        const nums = rangeInt(1, 100);
+
+        const rollGroup = createSlotRouletteGroup({
+          title: "1~100 숫자 룰렛",
+          sub: "각 칸 따로 돌리기 (동점이면 랜덤으로 순서 결정)",
+          labels: colors(),
+          items: nums,
+          uniqueWithinGroup: false,
+          onGroupChange: (vals) => renderOrder(vals)
+        });
+
+        stage2Wrap.appendChild(rollGroup.card);
+
+        const orderBox = document.createElement("div");
+        orderBox.className = "note";
+        orderBox.style.marginTop = "6px";
+        orderBox.textContent = "순서: (숫자를 전부 뽑으면 표시됨)";
+        stage2Wrap.appendChild(orderBox);
+
+        function renderOrder(vals){
+          if (vals.some(v => v == null)) {
+            orderBox.textContent = "순서: (숫자를 전부 뽑으면 표시됨)";
+            return;
+          }
+
+          const cs = colors();
+          const rows = cs.map((c, i) => ({ color: c, n: Number(vals[i]), rkey: Math.random() }));
+          rows.sort((a, b) => (b.n - a.n) || (a.rkey - b.rkey));
+
+          const orderText = rows.map((r, idx) => `${idx+1}등 ${r.color}(${r.n})`).join(" / ");
+          orderBox.textContent = `순서: ${orderText}  |  1등부터 원하는 상위를 하나씩 가져가면 됨`;
+        }
+      }
     }
   },
+
 
   "상위고정 1~4": {
     desc: "빨강/파랑/보라/노랑이 각각 1~4를 뽑고, 상위 유닛을 그 숫자에 맞게 무조건 가야함",
@@ -441,8 +463,7 @@ const RULES = {
 
   "신세계보상치기": {
     desc: "신세계 보상으로 받은 전설로 무조건 상위 유닛 가기(상위가 없는 캐릭은 안가도됨)",
-    build: () => {
-    }
+    build: () => {}
   },
 
   "강제상위": {
@@ -452,13 +473,12 @@ const RULES = {
         title: "강제상위: 상위 유닛 1개씩 (4명)",
         sub: "각 칸 따로 돌리기 / 중복 허용",
         labels: colors(),
-        items: HIGH_UNITS,
+        items: getHighUnitsForRestrictedRules(),
         uniqueWithinGroup: false
       });
       $extraArea.appendChild(g.card);
     }
   }
-
 };
 
 function defaultRule(ruleName){
