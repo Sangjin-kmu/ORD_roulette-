@@ -1,4 +1,4 @@
-// ===== DOM =====
+
 const $pickedRule = document.getElementById("pickedRule");
 const $desc = document.getElementById("desc");
 const $extraArea = document.getElementById("extraArea");
@@ -11,7 +11,6 @@ const $chev = document.getElementById("chev");
 const $ruleListWrap = document.getElementById("ruleListWrap");
 const $ruleList = document.getElementById("ruleList");
 
-// ===== DATA =====
 let MAIN_RULES = [];
 let HIGH_UNITS = [];
 let LEGEND_UNITS = [];
@@ -22,12 +21,10 @@ let mainLis = [];
 let mainIndex = 0;
 let isSpinningMain = false;
 
-// ===== Spin config (요청: 룰렛당 2초 이내) =====
-const SPIN_MS = 1500;       // 기본 1.5초 (2초 이내)
-const MIN_DELAY = 18;       // 빠를 때 틱
-const MAX_DELAY = 180;      // 느릴 때 틱
+const SPIN_MS = 1500;   
+const MIN_DELAY = 18; 
+const MAX_DELAY = 180;
 
-// ===== utils =====
 function easeOutQuad(t){ return 1 - (1 - t) * (1 - t); }
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
@@ -77,7 +74,6 @@ async function spinPickOne(items, { durationMs = SPIN_MS, minDelay = MIN_DELAY, 
   return items[idx];
 }
 
-// ===== UI builders =====
 function makeCard(title, subText){
   const card = document.createElement("div");
   card.className = "card";
@@ -179,7 +175,6 @@ function createSlotRouletteGroup({
 
 function colors(){ return ["빨강","파랑","보라","노랑"]; }
 
-// ===== Rules =====
 const RULES = {
   "원딜전": {
     desc: "항법은 자유, 갈수있는 상위는 무조건 1개로 제한",
@@ -252,7 +247,6 @@ const RULES = {
           allowedBox.textContent = allowed.length ? allowed.join(", ") : "해당 글자를 포함한 유닛이 없음(임시 데이터 가능)";
         }
 
-        // 초기
         renderAllowed(values);
 
         card.appendChild(note);
@@ -340,7 +334,6 @@ const RULES = {
       });
       $extraArea.appendChild(stage1.card);
 
-      // 2) 순서 1~4 (중복 금지)
       const { card: stage2Card } = makeCard("2단계: 순서 뽑기(1~4)", "1단계 4개가 모두 정해지면 진행");
       const stage2Wrap = document.createElement("div");
       stage2Card.appendChild(stage2Wrap);
@@ -479,7 +472,6 @@ function defaultRule(ruleName){
   };
 }
 
-// ===== main rule list & toggle =====
 function renderRuleList(){
   $ruleList.innerHTML = "";
   mainLis = MAIN_RULES.map((r) => {
@@ -518,7 +510,6 @@ async function spinMainRule(){
 
   const picked = await spinPickOne(MAIN_RULES, {
     onTick: (t) => {
-      // 현재 tick 값 기준으로 active 표시도 따라가게
       const idx = MAIN_RULES.indexOf(t);
       if (idx >= 0) setActiveRule(idx);
       $pickedRule.textContent = t;
@@ -537,7 +528,6 @@ async function spinMainRule(){
   isSpinningMain = false;
 }
 
-// ===== init =====
 async function init(){
   $toggleRulesBtn.addEventListener("click", toggleRuleList);
   $spinMainBtn.addEventListener("click", spinMainRule);
@@ -553,7 +543,6 @@ async function init(){
 
   renderRuleList();
 
-  // 첫 화면도 설명/추가룰 표시
   const first = MAIN_RULES[mainIndex];
   const def = RULES[first] ?? defaultRule(first);
   $desc.textContent = def.desc;
