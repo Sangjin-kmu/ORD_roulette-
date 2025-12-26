@@ -15,6 +15,8 @@ let HIGH_UNITS = [];
 let LEGEND_UNITS = [];
 let HIDDEN_UNITS = [];
 let LETTER_POOL = [];
+let CORSAIR = [];
+
 
 let mainLis = [];
 let mainIndex = 0;
@@ -303,7 +305,7 @@ const RULES = {
 
         const info = document.createElement("div");
         info.className = "note";
-        info.textContent = `추가 룰렛 대상:`;
+        info.textContent = `추가 룰렛 대상`;
         stage2Wrap.appendChild(info);
 
         const stage2Group = createSlotRouletteGroup({
@@ -478,7 +480,36 @@ const RULES = {
       });
       $extraArea.appendChild(g.card);
     }
+  },
+
+  "강제해적선": {
+    desc: "빨강/파랑/보라/노랑이 룰렛으로 해적선 1개를 뽑아서 반드시 가야함",
+    build: () => {
+      const g = createSlotRouletteGroup({
+        title: "강제해적선: 해적선 1개씩 (4명)",
+        sub: "각 칸 따로 돌리기",
+        labels: colors(),
+        items: CORSAIR,
+        uniqueWithinGroup: false
+      });
+      $extraArea.appendChild(g.card);
+    }
+  },
+
+  "압살롬모으기": {
+    desc: "빨강/파랑/보라/노랑이 각각 5~20 숫자를 뽑고, 해당 숫자만큼 압살롬을 모아야함",
+    build: () => {
+      const g = createSlotRouletteGroup({
+        title: "압살롬 모으기 (5~20)",
+        sub: "각 칸 따로 돌리기",
+        labels: colors(),
+        items: rangeInt(5, 20),
+        uniqueWithinGroup: false
+      });
+      $extraArea.appendChild(g.card);
+    }
   }
+
 };
 
 function defaultRule(ruleName){
@@ -560,6 +591,8 @@ async function init(){
   LEGEND_UNITS = data.legendUnits ?? [];
   HIDDEN_UNITS = data.hiddenUnits ?? [];
   LETTER_POOL = data.letterPool ?? [];
+  CORSAIR = data.corsair ?? [];
+
 
   renderRuleList();
 
