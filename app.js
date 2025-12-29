@@ -503,13 +503,13 @@ const RULES = {
   },
 
   "압살롬모으기": {
-    desc: "빨강/파랑/보라/노랑이 각각 5~20 숫자를 뽑고, 해당 숫자만큼 압살롬을 모아야함",
+    desc: "빨강/파랑/보라/노랑이 각각 3~10 숫자를 뽑고, 해당 숫자만큼 압살롬을 모아야함",
     build: () => {
       const g = createSlotRouletteGroup({
-        title: "압살롬 모으기 (5~20)",
+        title: "압살롬 모으기 (3~10)",
         sub: "각 칸 따로 돌리기",
         labels: colors(),
-        items: rangeInt(5, 20),
+        items: rangeInt(3, 10),
         uniqueWithinGroup: false
       });
       $extraArea.appendChild(g.card);
