@@ -502,20 +502,6 @@ const RULES = {
     }
   },
 
-  "압살롬모으기": {
-    desc: "빨강/파랑/보라/노랑이 각각 3~10 숫자를 뽑고, 해당 숫자만큼 압살롬을 모아야함",
-    build: () => {
-      const g = createSlotRouletteGroup({
-        title: "압살롬 모으기 (3~10)",
-        sub: "각 칸 따로 돌리기",
-        labels: colors(),
-        items: rangeInt(3, 10),
-        uniqueWithinGroup: false
-      });
-      $extraArea.appendChild(g.card);
-    }
-  },
-
   "책임완수": {
     desc: "돌리기 1번으로 파랑/빨강/보라/노랑에게 종/문(해군대장)/해왕류/룸바영혼을 중복 없이 1개씩 배정. 배정된 임무는 반드시 책임지고 클리어.",
     build: () => {
@@ -611,7 +597,31 @@ const RULES = {
 
       $extraArea.appendChild(card);
     }
-  }
+  },
+  "전설위습먹기": {
+    desc: "바질 호킨스를 이용해 위습 도박하기. 최대 위습 등급에 따라\n전설 유카 + 0\n희귀 유카 + 15\n특별함 이하 유카 + 30",
+    build: () => {}
+  },
+
+  "향로개척": {
+    desc: "자신의 퀘스트(미션)을 다 깨는게 목표. 1개를 못깰때 마다 유카 + 10",
+    build: () => {}
+  },
+
+  "스토리보상랜덤": {
+    desc: "스토리 10을 파괴한 후 나오는 위습을 통해 목박/초월위습/레적선 보상을 룰렛으로 정해진대로 가기",
+    build: () => {
+      const g = createSlotRouletteGroup({
+        title: "스토리보상랜덤(4명)",
+        sub: "각 칸 따로 돌리기",
+        labels: colors(),
+        items: ["목박", "초월위습", "레적선"],
+        uniqueWithinGroup: false
+      });
+      $extraArea.appendChild(g.card);
+    }
+  },
+
 
 
 };
