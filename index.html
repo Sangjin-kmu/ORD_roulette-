@@ -13,36 +13,85 @@
 
   <main class="wrap">
     <section class="panel">
-      <div class="mainBox">
-        <div class="label">선택된 룰</div>
-        <div id="pickedRule" class="picked">룰을 뽑아주세요</div>
 
-        <button id="spinMainBtn" class="btnMain">룰 뽑기!</button>
+      <div id="lobbyUI" class="lobby">
+        <div class="lobbyHero">
+          <div class="lobbyTitle">방 만들기 / 참여하기</div>
+          <div class="lobbySub">방을 만들거나, 방 코드로 참여하세요.</div>
 
-        <button id="toggleRulesBtn" class="toggle">
-          전체 룰 목록 보기 (<span id="ruleCount">0</span>개) <span id="chev">▼</span>
-        </button>
+          <div class="heroBtns">
+            <button id="createRoomBtn" class="btnHero">방 만들기</button>
+            <button id="openJoinBtn" class="btnHero">참여하기</button>
+          </div>
 
-        <div id="ruleListWrap" class="ruleList hidden">
-          <ul id="ruleList"></ul>
+          <div id="lobbyInfo" class="lobbyInfo">—</div>
         </div>
       </div>
 
-      <div class="hr"></div>
+      <div id="joinOverlay" class="overlay hidden">
+        <div class="overlayCard glass">
+          <button id="closeJoinX" class="overlayClose" aria-label="닫기">✕</button>
 
-      <section class="detail">
-        <div class="detailTitle">설명</div>
-        <div id="desc" class="desc">아래 '룰 뽑기' 버튼을 눌러 시작하세요.</div>
-      </section>
+          <div class="overlayTitle">방 참여하기</div>
+          <div class="overlaySub">방 코드를 입력하면 바로 입장합니다.</div>
 
-      <section class="extra">
-        <div class="detailTitle">추가 룰렛 / 결과</div>
-        <div id="extraArea" class="stack"></div>
-      </section>
+          <div class="joinRow">
+            <input id="joinRoomInput" class="roomInput big" placeholder="방 코드 입력 (예: A1B2C3)" autocomplete="off" />
+            <button id="joinRoomBtn" class="btnSub big">입장</button>
+          </div>
+
+          <div class="joinActions">
+            <button id="closeJoinBtn" class="btnSub">취소</button>
+          </div>
+
+          <div id="joinInfo" class="note" style="margin-top:10px;">—</div>
+        </div>
+      </div>
+
+      <div id="roomUI" class="hidden">
+        <div class="mainBox">
+          <div class="label">선택된 룰</div>
+          <div id="pickedRule" class="picked">룰을 뽑아주세요</div>
+
+          <button id="spinMainBtn" class="btnMain">룰 뽑기!</button>
+
+          <div class="roomTopRow">
+            <div class="roomInfoWrap">
+              <div id="roomInfo" class="roomInfo">방 코드: —</div>
+              <button id="copyRoomCodeBtn" class="btnSub">코드 복사</button>
+            </div>
+            <button id="leaveRoomBtn" class="btnSub">나가기</button>
+          </div>
+
+          <button id="toggleRulesBtn" class="toggle">
+            전체 룰 목록 보기 (<span id="ruleCount">0</span>) <span id="chev">▼</span>
+          </button>
+
+          <div id="ruleListWrap" class="ruleList hidden">
+            <ul id="ruleList"></ul>
+          </div>
+        </div>
+
+        <div class="hr"></div>
+
+        <section class="detail">
+          <div class="detailTitle">설명</div>
+          <div id="desc" class="desc">아래 '룰 뽑기' 버튼을 눌러 시작하세요.</div>
+        </section>
+
+        <section class="extra">
+          <div class="detailTitle">추가 룰렛 / 결과</div>
+          <div id="extraArea" class="stack"></div>
+        </section>
+      </div>
+
     </section>
   </main>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
   <script src="./app.js"></script>
 </body>
 </html>
-
