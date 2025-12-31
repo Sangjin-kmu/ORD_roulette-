@@ -85,12 +85,27 @@ const SPIN_MS = 1500;
 const MIN_DELAY = 18;
 const MAX_DELAY = 180;
 
+const HOST_PING_MS = 15000;
+const MEMBER_BEAT_MS = 15000;
+const HOST_TIMEOUT_MS = 45000;
+const MEMBER_ALIVE_MS = 45000;
+
 const BANNED_HIGH_UNITS = new Set([
-  "보르살리노(키자루)",
   "우타",
   "몽키 D. 루피(니카)",
   "마르코"
 ]);
+
+let ruleCheckboxMap = new Map();
+
+let lastRoomHostPing = null;
+let lastIsHostUI = null;
+let lastEnabledSig = "";
+let lastRoomInfoText = "";
+let lastPickedSig = "";
+let lastSlotSig = "";
+let eventsBootstrapped = false;
+let lastMemberSig = "";
 
 function toast(msg, ms = 1200){
   const el = document.createElement("div");
@@ -152,17 +167,17 @@ function makeScaledDelays(totalTicks, durationMs, minDelay, maxDelay){
   }
   const sum = delays.reduce((a,b)=>a+b, 0);
   const scale = durationMs / sum;
-  return delays.map(d => Math.max(10, d * scale));
+  return delays.map(d => Math.max(8, d * scale));
 }
 
 async function spinBySteps(items, { startIdx, steps, durationMs = SPIN_MS, minDelay = MIN_DELAY, maxDelay = MAX_DELAY, onTick }){
   if (!items || items.length === 0) return null;
 
   const len = items.length;
-  const totalTicks = Math.max(12, Math.min(140, steps));
+  const totalTicks = Math.max(10, Math.min(480, steps || 0));
   const delays = makeScaledDelays(totalTicks, durationMs, minDelay, maxDelay);
 
-  let idx = startIdx % len;
+  let idx = (startIdx ?? 0) % len;
   for (let i=0; i<totalTicks; i++){
     idx = (idx + 1) % len;
     onTick?.(items[idx], idx);
@@ -172,7 +187,10 @@ async function spinBySteps(items, { startIdx, steps, durationMs = SPIN_MS, minDe
 }
 
 function randInt(min, max){
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  const r = (typeof crypto !== "undefined" && crypto.getRandomValues)
+    ? (()=>{ const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] / 4294967296; })()
+    : Math.random();
+  return Math.floor(r * (max - min + 1)) + min;
 }
 
 function makeSpinPlan(pool){
@@ -201,6 +219,15 @@ function showLobby(){
 
   const saved = localStorage.getItem("ord_nick") || "";
   $nickInput.value = saved;
+
+  lastRoomHostPing = null;
+  lastIsHostUI = null;
+  lastEnabledSig = "";
+  lastRoomInfoText = "";
+  lastPickedSig = "";
+  lastSlotSig = "";
+  lastMemberSig = "";
+  eventsBootstrapped = false;
 }
 
 function showRoom(){
@@ -246,6 +273,8 @@ function detachRoom(){
   handledEventIds.clear();
   mainSpinAnimating = false;
   isSpinningMain = false;
+  eventsBootstrapped = false;
+  lastMemberSig = "";
 }
 
 async function ensureAuth(){
@@ -286,22 +315,24 @@ function applyHostUI(host){
     const cb = ruleCheckboxMap.get(r);
     if (cb) cb.disabled = !host;
   });
+  slotRegistry.forEach((slot)=>{
+    if (slot?.btnEl) slot.btnEl.style.display = host ? "" : "none";
+  });
 }
-
-let lastRoomHostPing = null;
 
 function attachRoomListeners(){
   detachRoom();
+  eventsBootstrapped = false;
 
-  unsubRoom = roomRef.onSnapshot((doc)=>{
-    if (!doc.exists){
+  unsubRoom = roomRef.onSnapshot((docSnap)=>{
+    if (!docSnap.exists){
       toast("방이 사라졌습니다.");
       detachRoom();
       showLobby();
       return;
     }
 
-    const data = doc.data();
+    const data = docSnap.data() || {};
     if (data.closed){
       toast(data.closedMsg || "방이 사라졌습니다.");
       detachRoom();
@@ -309,12 +340,22 @@ function attachRoomListeners(){
       return;
     }
 
-    isHost = (data.hostUid === uid);
-    applyHostUI(isHost);
+    const nextIsHost = (data.hostUid === uid);
+    if (lastIsHostUI === null || nextIsHost !== lastIsHostUI){
+      isHost = nextIsHost;
+      lastIsHostUI = nextIsHost;
+      applyHostUI(isHost);
+    } else {
+      isHost = nextIsHost;
+    }
 
     const enabled = Array.isArray(data.enabledRules) ? data.enabledRules : [...MAIN_RULES];
-    enabledRulesSet = new Set(enabled);
-    syncRuleCheckboxesFromRoom(enabledRulesSet);
+    const enabledSig = enabled.join("|");
+    if (enabledSig !== lastEnabledSig){
+      lastEnabledSig = enabledSig;
+      enabledRulesSet = new Set(enabled);
+      syncRuleCheckboxesFromRoom(enabledRulesSet);
+    }
 
     lastRoomHostPing = data.hostPing || null;
 
@@ -322,38 +363,63 @@ function attachRoomListeners(){
       if (hostWatchTimer) clearInterval(hostWatchTimer);
       hostWatchTimer = setInterval(()=>{
         const latest = tsToMs(lastRoomHostPing);
-        if (latest && (nowMs() - latest) > 20000){
+        if (latest && (nowMs() - latest) > HOST_TIMEOUT_MS){
           toast("방이 사라졌습니다.");
           leaveRoom({ close:false, silent:true });
         }
-      }, 2000);
+      }, 3000);
+    } else {
+      if (hostWatchTimer) { clearInterval(hostWatchTimer); hostWatchTimer = null; }
     }
 
     const state = data.state || {};
     const picked = state.pickedRule || null;
+    const slotValues = state.slotValues || {};
+    const slotSig = Object.keys(slotValues).sort().map(k => `${k}:${slotValues[k]}`).join("|");
+    const pickedSig = picked ? String(picked) : "";
 
     if (!mainSpinAnimating){
-      if (picked && picked !== currentRuleName){
+      if (picked && pickedSig !== lastPickedSig){
+        lastPickedSig = pickedSig;
         currentRuleName = picked;
         $pickedRule.textContent = picked;
         buildRuleUI(picked);
-        applySlotValues(state.slotValues || {});
-      }
-      if (!picked && currentRuleName !== null){
+        lastSlotSig = "";
+        if (slotSig) {
+          applySlotValues(slotValues);
+          lastSlotSig = slotSig;
+        } else {
+          lastSlotSig = "";
+        }
+      } else if (!picked && lastPickedSig){
+        lastPickedSig = "";
         currentRuleName = null;
         $pickedRule.textContent = "룰을 뽑아주세요";
         $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
         clearExtra();
+        lastSlotSig = "";
+      } else if (picked && currentRuleName === picked && slotSig !== lastSlotSig){
+        applySlotValues(slotValues);
+        lastSlotSig = slotSig;
       }
     }
 
-    $roomInfo.textContent = `방 코드: ${roomId}`;
+    const infoText = `방 코드: ${roomId}`;
+    if (infoText !== lastRoomInfoText){
+      lastRoomInfoText = infoText;
+      $roomInfo.textContent = infoText;
+    }
   });
 
   unsubEvents = roomEvents()
     .orderBy("createdAt", "asc")
     .limit(300)
     .onSnapshot((snap)=>{
+      if (!eventsBootstrapped){
+        snap.forEach(d => handledEventIds.add(d.id));
+        eventsBootstrapped = true;
+        return;
+      }
       snap.docChanges().forEach((ch)=>{
         if (ch.type !== "added") return;
         const id = ch.doc.id;
@@ -370,12 +436,17 @@ function attachRoomListeners(){
       const now = nowMs();
       const list = [];
       snap.forEach((d)=>{
-        const m = d.data();
-        const ms = tsToMs(m.lastSeen);
-        if (ms && (now - ms) <= 25000){
+        const m = d.data() || {};
+        const msRaw = tsToMs(m.lastSeen);
+        const ms = msRaw || now;
+        if ((now - ms) <= MEMBER_ALIVE_MS){
           list.push(m);
         }
       });
+
+      const sig = list.map(m => `${m.uid}:${(m.nick||"익명")}`).join("|");
+      if (sig === lastMemberSig) return;
+      lastMemberSig = sig;
 
       $memberCount.textContent = `${list.length}명`;
       $memberList.innerHTML = "";
@@ -394,7 +465,7 @@ function attachRoomListeners(){
       hostPing: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     }, { merge:true }).catch(()=>{});
-  }, 5000);
+  }, HOST_PING_MS);
 
   if (memberBeatTimer) clearInterval(memberBeatTimer);
   memberBeatTimer = setInterval(async ()=>{
@@ -403,7 +474,7 @@ function attachRoomListeners(){
       lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
       nick: getNick()
     }, { merge:true }).catch(()=>{});
-  }, 8000);
+  }, MEMBER_BEAT_MS);
 }
 
 async function emitEvent(payload){
@@ -535,11 +606,11 @@ function createSlotRouletteGroup({
 
       setTimeout(()=>{
         if (!roomRef) return;
-        roomRef.set({
+        roomRef.update({
           updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          state: { slotValues: { [slotId]: plan.picked } }
-        }, { merge:true }).catch(()=>{});
-      }, SPIN_MS + 120);
+          [`state.slotValues.${slotId}`]: plan.picked
+        }).catch(()=>{});
+      }, SPIN_MS + 140);
     };
 
     top.appendChild(lab);
@@ -582,20 +653,19 @@ function applySlotValues(slotValues){
     const slot = slotRegistry.get(slotId);
     if (slot){
       slot.valEl.textContent = picked;
-      const [g, idxStr] = slotId.split(":");
-      const gi = groupNotifyRegistry.get(g);
-      if (gi){
-        const i = Number(idxStr);
-        if (!Number.isNaN(i)){
-          gi.values[i] = picked;
-          gi.notify();
+      const parts = String(slotId).split(":");
+      if (parts.length === 2){
+        const gid = parts[0];
+        const idx = Number(parts[1]);
+        const g = groupNotifyRegistry.get(gid);
+        if (g && !Number.isNaN(idx)){
+          g.values[idx] = picked;
+          g.notify();
         }
       }
     }
   });
 }
-
-let ruleCheckboxMap = new Map();
 
 function renderRuleList(){
   $ruleList.innerHTML = "";
@@ -627,7 +697,6 @@ function renderRuleList(){
 
       const next = new Set(enabledRulesSet);
       if (cb.checked) next.add(r); else next.delete(r);
-
       enabledRulesSet = next;
 
       await roomRef.set({
@@ -646,7 +715,8 @@ function syncRuleCheckboxesFromRoom(set){
   MAIN_RULES.forEach((r)=>{
     const cb = ruleCheckboxMap.get(r);
     if (!cb) return;
-    cb.checked = set.has(r);
+    const should = set.has(r);
+    if (cb.checked !== should) cb.checked = should;
     cb.disabled = !isHost;
   });
 }
@@ -691,11 +761,12 @@ async function spinMainRule(){
 
   setTimeout(()=>{
     if (!roomRef) return;
-    roomRef.set({
+    roomRef.update({
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      state: { pickedRule: plan.picked, slotValues: {} }
-    }, { merge:true }).catch(()=>{});
-  }, SPIN_MS + 140);
+      "state.pickedRule": plan.picked,
+      "state.slotValues": {}
+    }).catch(()=>{});
+  }, SPIN_MS + 160);
 
   isSpinningMain = false;
 }
@@ -860,6 +931,12 @@ const RULES = {
         }
 
         stage2Wrap.innerHTML = "";
+        const note = document.createElement("div");
+        note.className = "note";
+        note.style.whiteSpace = "pre-line";
+        note.textContent = "—";
+        stage2Wrap.appendChild(note);
+
         const orderGroup = createSlotRouletteGroup({
           groupId: "r_jitsu_stage2",
           title: "4명 숫자 뽑기",
@@ -868,13 +945,10 @@ const RULES = {
           items: rangeInt(1, 100),
           uniqueWithinGroup: true,
           onGroupChange: (nums) => {
-            if (nums.some(v=>v==null)) return;
+            if (nums.some(v=>v==null)) { note.textContent = "—"; return; }
             const arr = colors().map((c,i)=>({ color:c, n:Number(nums[i]) }));
             arr.sort((a,b)=> b.n - a.n);
-            const note = document.createElement("div");
-            note.className = "note";
-            note.textContent = `픽 순서: ${arr.map(x=>`${x.color}(${x.n})`).join(" > ")} / 상위 4개: ${vals.join(", ")}`;
-            stage2Wrap.appendChild(note);
+            note.textContent = `픽 순서: ${arr.map(x=>`${x.color}(${x.n})`).join(" > ")}\n상위 4개: ${vals.join(", ")}`;
           }
         });
 
@@ -1004,12 +1078,13 @@ const RULES = {
       btn.onclick = async () => {
         if (!isHost) return;
 
-        const pool = tasks.slice();
+        const poolLeft = tasks.slice();
         const slots = colors().map((c, i)=>{
-          const p = pool.slice();
+          const p = poolLeft.slice();
           const plan = makeSpinPlan(p);
           const picked = plan.picked;
-          pool.splice(pool.indexOf(picked), 1);
+          const idx = poolLeft.indexOf(picked);
+          if (idx >= 0) poolLeft.splice(idx, 1);
 
           const slotId = `${groupId}:${i}`;
           return {
@@ -1026,13 +1101,14 @@ const RULES = {
 
         setTimeout(()=>{
           if (!roomRef) return;
-          const slotMap = {};
-          slots.forEach(s => slotMap[s.slotId] = s.picked);
-          roomRef.set({
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            state: { slotValues: slotMap }
-          }, { merge:true }).catch(()=>{});
-        }, SPIN_MS + 140);
+          const updates = {
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          slots.forEach(s => {
+            updates[`state.slotValues.${s.slotId}`] = s.picked;
+          });
+          roomRef.update(updates).catch(()=>{});
+        }, SPIN_MS + 160);
       };
 
       btnRow.appendChild(btn);
@@ -1128,6 +1204,7 @@ function buildRuleUI(rule){
   const def = RULES[rule] ?? defaultRule(rule);
   $desc.textContent = def.desc;
   def.build();
+  if (lastIsHostUI !== null) applyHostUI(lastIsHostUI);
 }
 
 async function playMainSpinEvent(ev){
@@ -1156,6 +1233,7 @@ async function playMainSpinEvent(ev){
 
   const picked = ev.pickedRule || $pickedRule.textContent;
   currentRuleName = picked;
+  lastPickedSig = picked ? String(picked) : "";
 
   buildRuleUI(picked);
 
@@ -1188,17 +1266,16 @@ async function playSlotSpinEvent(ev){
 
 async function playBatchSpinEvent(ev){
   const slots = ev.slots || [];
-  for (const s of slots){
+  await Promise.all(slots.map(async (s)=>{
     const slot = slotRegistry.get(s.slotId);
-    if (!slot) continue;
-
+    if (!slot) return;
     await slot.setValue(s.picked, {
       pool: s.pool,
       startIdx: s.startIdx,
       steps: s.steps,
       durationMs: s.durationMs ?? SPIN_MS
     });
-  }
+  }));
 }
 
 async function createRoom(){
@@ -1345,6 +1422,12 @@ async function init(){
 
   $nickInput.addEventListener("input", ()=>{
     saveNick();
+    if (roomId && uid){
+      roomMembers().doc(uid).set({
+        nick: getNick(),
+        lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true }).catch(()=>{});
+    }
   });
 
   showLobby();
