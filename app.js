@@ -21,12 +21,17 @@ const $joinOverlay = document.getElementById("joinOverlay");
 const $joinRoomInput = document.getElementById("joinRoomInput");
 const $joinRoomBtn = document.getElementById("joinRoomBtn");
 const $closeJoinBtn = document.getElementById("closeJoinBtn");
-const $closeJoinX = document.getElementById("closeJoinX");
 const $joinInfo = document.getElementById("joinInfo");
 
 const $roomInfo = document.getElementById("roomInfo");
 const $copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
 const $leaveRoomBtn = document.getElementById("leaveRoomBtn");
+
+const $toastRoot = document.getElementById("toastRoot");
+
+const $nickInput = document.getElementById("nickInput");
+const $memberCount = document.getElementById("memberCount");
+const $memberList = document.getElementById("memberList");
 
 const firebaseConfig = {
   apiKey: "AIzaSyCxRFYGtDtGik3qD_yDj5bioqHp4xSrFTQ",
@@ -58,9 +63,11 @@ let isHost = false;
 
 let unsubRoom = null;
 let unsubEvents = null;
+let unsubMembers = null;
 
 let hostPingTimer = null;
 let hostWatchTimer = null;
+let memberBeatTimer = null;
 
 let handledEventIds = new Set();
 
@@ -68,20 +75,48 @@ let mainLis = [];
 let enabledRulesSet = new Set();
 let currentRuleName = null;
 
-let slotRegistry = new Map(); 
+let slotRegistry = new Map();
 let groupNotifyRegistry = new Map();
 
 let isSpinningMain = false;
+let mainSpinAnimating = false;
 
 const SPIN_MS = 1500;
 const MIN_DELAY = 18;
 const MAX_DELAY = 180;
 
 const BANNED_HIGH_UNITS = new Set([
+  "보르살리노(키자루)",
   "우타",
   "몽키 D. 루피(니카)",
   "마르코"
 ]);
+
+function toast(msg, ms = 1200){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  $toastRoot.appendChild(el);
+  setTimeout(()=>{
+    el.classList.add("out");
+    setTimeout(()=> el.remove(), 250);
+  }, ms);
+}
+
+function nowMs(){ return Date.now(); }
+function tsToMs(ts){ return ts && typeof ts.toMillis === "function" ? ts.toMillis() : 0; }
+
+function getNick(){
+  const raw = ($nickInput?.value ?? "").trim();
+  if (raw) return raw.slice(0, 16);
+  const saved = (localStorage.getItem("ord_nick") || "").trim();
+  return saved ? saved.slice(0, 16) : "익명";
+}
+
+function saveNick(){
+  const raw = ($nickInput?.value ?? "").trim();
+  localStorage.setItem("ord_nick", raw ? raw.slice(0,16) : "");
+}
 
 function filteredHighUnitsFor(ruleName){
   const needBan = new Set(["원딜전","4인강제전","꼭가야할상위","강제상위","지츠다이스"]);
@@ -124,7 +159,7 @@ async function spinBySteps(items, { startIdx, steps, durationMs = SPIN_MS, minDe
   if (!items || items.length === 0) return null;
 
   const len = items.length;
-  const totalTicks = Math.max(12, Math.min(120, steps));
+  const totalTicks = Math.max(12, Math.min(140, steps));
   const delays = makeScaledDelays(totalTicks, durationMs, minDelay, maxDelay);
 
   let idx = startIdx % len;
@@ -154,7 +189,6 @@ function showLobby(){
   $lobbyUI.classList.remove("hidden");
   $roomUI.classList.add("hidden");
   closeJoinOverlay();
-  $lobbyInfo.textContent = "—";
 
   roomId = null;
   roomRef = null;
@@ -164,6 +198,9 @@ function showLobby(){
   $pickedRule.textContent = "룰을 뽑아주세요";
   $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
   clearExtra();
+
+  const saved = localStorage.getItem("ord_nick") || "";
+  $nickInput.value = saved;
 }
 
 function showRoom(){
@@ -191,131 +228,74 @@ async function copyText(t){
   }
 }
 
-function nowMs(){ return Date.now(); }
+function detachRoom(){
+  if (unsubRoom) unsubRoom();
+  if (unsubEvents) unsubEvents();
+  if (unsubMembers) unsubMembers();
+  unsubRoom = null;
+  unsubEvents = null;
+  unsubMembers = null;
 
-function tsToMs(ts){
-  if (!ts) return 0;
-  if (typeof ts.toMillis === "function") return ts.toMillis();
-  return 0;
-}
+  if (hostPingTimer) clearInterval(hostPingTimer);
+  if (hostWatchTimer) clearInterval(hostWatchTimer);
+  if (memberBeatTimer) clearInterval(memberBeatTimer);
+  hostPingTimer = null;
+  hostWatchTimer = null;
+  memberBeatTimer = null;
 
-function roomDoc(){
-  return db.collection("rooms").doc(roomId);
-}
-function roomEvents(){
-  return db.collection("rooms").doc(roomId).collection("events");
+  handledEventIds.clear();
+  mainSpinAnimating = false;
+  isSpinningMain = false;
 }
 
 async function ensureAuth(){
   if (uid) return uid;
-
   await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-  if (!auth.currentUser) {
-    await auth.signInAnonymously();
-  }
+  if (!auth.currentUser) await auth.signInAnonymously();
   uid = auth.currentUser.uid;
   return uid;
 }
 
-function detachRoom(){
-  if (unsubRoom) unsubRoom();
-  if (unsubEvents) unsubEvents();
-  unsubRoom = null;
-  unsubEvents = null;
-
-  if (hostPingTimer) clearInterval(hostPingTimer);
-  if (hostWatchTimer) clearInterval(hostWatchTimer);
-  hostPingTimer = null;
-  hostWatchTimer = null;
-
-  handledEventIds.clear();
+function roomEvents(){
+  return db.collection("rooms").doc(roomId).collection("events");
+}
+function roomMembers(){
+  return db.collection("rooms").doc(roomId).collection("members");
 }
 
-async function createRoom(){
-  await ensureAuth();
-
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  async function gen(){
-    let code = "";
-    for (let i=0; i<6; i++) code += alphabet[Math.floor(Math.random()*alphabet.length)];
-    return code;
-  }
-
-  for (let attempt=0; attempt<8; attempt++){
-    const code = await gen();
-    const ref = db.collection("rooms").doc(code);
-    const snap = await ref.get();
-    if (snap.exists) continue;
-
-    const enabled = [...MAIN_RULES];
-    const payload = {
-      hostUid: uid,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      closed: false,
-      hostPing: firebase.firestore.FieldValue.serverTimestamp(),
-      enabledRules: enabled,
-      state: {
-        pickedRule: null,
-        slotValues: {}
-      }
-    };
-
-    await ref.set(payload);
-    await enterRoom(code);
-    return;
-  }
-
-  $lobbyInfo.textContent = "방 코드 생성에 실패했습니다. 다시 시도해주세요.";
+async function upsertMember(){
+  if (!roomId || !uid) return;
+  const nick = getNick();
+  await roomMembers().doc(uid).set({
+    uid,
+    nick,
+    joinedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+  }, { merge:true }).catch(()=>{});
 }
 
-async function enterRoom(code){
-  await ensureAuth();
-
-  const ref = db.collection("rooms").doc(code.toUpperCase().trim());
-  const snap = await ref.get();
-  if (!snap.exists){
-    $joinInfo.textContent = "해당 방이 없습니다.";
-    return;
-  }
-  const data = snap.data();
-  if (data.closed){
-    $joinInfo.textContent = "이미 종료된 방입니다.";
-    return;
-  }
-
-  roomId = ref.id;
-  roomRef = ref;
-  showRoom();
-  closeJoinOverlay();
-
-  attachRoomListeners();
+async function deleteMember(){
+  if (!roomId || !uid) return;
+  await roomMembers().doc(uid).delete().catch(()=>{});
 }
 
-async function leaveRoom({ close = false } = {}){
-  if (!roomId) { showLobby(); return; }
-
-  try{
-    if (close && isHost){
-      await roomRef.set({
-        closed: true,
-        closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge:true });
-
-      await roomRef.delete().catch(()=>{});
-    }
-  }catch(e){}
-
-  detachRoom();
-  showLobby();
+function applyHostUI(host){
+  $spinMainBtn.style.display = host ? "" : "none";
+  $leaveRoomBtn.textContent = host ? "방 닫기" : "나가기";
+  MAIN_RULES.forEach((r)=>{
+    const cb = ruleCheckboxMap.get(r);
+    if (cb) cb.disabled = !host;
+  });
 }
+
+let lastRoomHostPing = null;
 
 function attachRoomListeners(){
   detachRoom();
 
   unsubRoom = roomRef.onSnapshot((doc)=>{
     if (!doc.exists){
+      toast("방이 사라졌습니다.");
       detachRoom();
       showLobby();
       return;
@@ -323,6 +303,7 @@ function attachRoomListeners(){
 
     const data = doc.data();
     if (data.closed){
+      toast(data.closedMsg || "방이 사라졌습니다.");
       detachRoom();
       showLobby();
       return;
@@ -335,31 +316,35 @@ function attachRoomListeners(){
     enabledRulesSet = new Set(enabled);
     syncRuleCheckboxesFromRoom(enabledRulesSet);
 
-    const ping = tsToMs(data.hostPing);
+    lastRoomHostPing = data.hostPing || null;
+
     if (!isHost){
       if (hostWatchTimer) clearInterval(hostWatchTimer);
       hostWatchTimer = setInterval(()=>{
-        const latest = tsToMs(lastRoomHostPingMs);
+        const latest = tsToMs(lastRoomHostPing);
         if (latest && (nowMs() - latest) > 20000){
-          leaveRoom({ close:false });
+          toast("방이 사라졌습니다.");
+          leaveRoom({ close:false, silent:true });
         }
       }, 2000);
     }
 
     const state = data.state || {};
     const picked = state.pickedRule || null;
-    lastRoomHostPingMs = data.hostPing || null;
 
-    if (picked && picked !== currentRuleName){
-      currentRuleName = picked;
-      renderPickedRuleOnly(picked);
-      buildRuleUI(picked);
-      applySlotValues(state.slotValues || {});
-    }else if (!picked && currentRuleName !== null){
-      currentRuleName = null;
-      $pickedRule.textContent = "룰을 뽑아주세요";
-      $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
-      clearExtra();
+    if (!mainSpinAnimating){
+      if (picked && picked !== currentRuleName){
+        currentRuleName = picked;
+        $pickedRule.textContent = picked;
+        buildRuleUI(picked);
+        applySlotValues(state.slotValues || {});
+      }
+      if (!picked && currentRuleName !== null){
+        currentRuleName = null;
+        $pickedRule.textContent = "룰을 뽑아주세요";
+        $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
+        clearExtra();
+      }
     }
 
     $roomInfo.textContent = `방 코드: ${roomId}`;
@@ -367,14 +352,37 @@ function attachRoomListeners(){
 
   unsubEvents = roomEvents()
     .orderBy("createdAt", "asc")
-    .limit(200)
+    .limit(300)
     .onSnapshot((snap)=>{
       snap.docChanges().forEach((ch)=>{
         if (ch.type !== "added") return;
         const id = ch.doc.id;
         if (handledEventIds.has(id)) return;
         handledEventIds.add(id);
-        handleEvent(ch.doc.data(), id);
+        handleEvent(ch.doc.data());
+      });
+    });
+
+  unsubMembers = roomMembers()
+    .orderBy("joinedAt", "asc")
+    .limit(50)
+    .onSnapshot((snap)=>{
+      const now = nowMs();
+      const list = [];
+      snap.forEach((d)=>{
+        const m = d.data();
+        const ms = tsToMs(m.lastSeen);
+        if (ms && (now - ms) <= 25000){
+          list.push(m);
+        }
+      });
+
+      $memberCount.textContent = `${list.length}명`;
+      $memberList.innerHTML = "";
+      list.forEach((m)=>{
+        const li = document.createElement("li");
+        li.textContent = m.nick || "익명";
+        $memberList.appendChild(li);
       });
     });
 
@@ -388,27 +396,14 @@ function attachRoomListeners(){
     }, { merge:true }).catch(()=>{});
   }, 5000);
 
-  window.onbeforeunload = () => {
-    if (roomId && isHost){
-      try{
-        navigator.sendBeacon?.("", "");
-      }catch(e){}
-      roomRef.set({
-        closed: true,
-        closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }, { merge:true }).catch(()=>{});
-      roomRef.delete().catch(()=>{});
-    }
-  };
-}
-
-let lastRoomHostPingMs = null;
-
-function applyHostUI(host){
-  $spinMainBtn.style.display = host ? "" : "none";
-  $leaveRoomBtn.textContent = host ? "방 닫기" : "나가기";
-  $copyRoomCodeBtn.style.display = "" ;
+  if (memberBeatTimer) clearInterval(memberBeatTimer);
+  memberBeatTimer = setInterval(async ()=>{
+    if (!roomId || !uid) return;
+    await roomMembers().doc(uid).set({
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+      nick: getNick()
+    }, { merge:true }).catch(()=>{});
+  }, 8000);
 }
 
 async function emitEvent(payload){
@@ -530,7 +525,6 @@ function createSlotRouletteGroup({
 
       await emitEvent({
         type: "slotSpin",
-        roomId,
         slotId,
         pool,
         startIdx: plan.startIdx,
@@ -539,14 +533,13 @@ function createSlotRouletteGroup({
         picked: plan.picked
       });
 
-      roomRef.set({
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        state: {
-          slotValues: {
-            [slotId]: plan.picked
-          }
-        }
-      }, { merge:true }).catch(()=>{});
+      setTimeout(()=>{
+        if (!roomRef) return;
+        roomRef.set({
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          state: { slotValues: { [slotId]: plan.picked } }
+        }, { merge:true }).catch(()=>{});
+      }, SPIN_MS + 120);
     };
 
     top.appendChild(lab);
@@ -577,10 +570,9 @@ function createSlotRouletteGroup({
   });
 
   body.appendChild(grid);
-
   registerGroup(groupId, values, notify, setValueAt);
 
-  return { card, values, setValueAt, poolForSlot };
+  return { card, values };
 }
 
 function applySlotValues(slotValues){
@@ -609,13 +601,12 @@ function renderRuleList(){
   $ruleList.innerHTML = "";
   ruleCheckboxMap.clear();
 
-  MAIN_RULES.forEach((r, idx) => {
+  mainLis = MAIN_RULES.map((r) => {
     const li = document.createElement("li");
 
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = true;
-    cb.style.transform = "scale(1.1)";
 
     const span = document.createElement("span");
     span.textContent = r;
@@ -644,6 +635,8 @@ function renderRuleList(){
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       }, { merge:true }).catch(()=>{});
     });
+
+    return li;
   });
 
   $ruleCount.textContent = String(MAIN_RULES.length);
@@ -670,13 +663,12 @@ function toggleRuleList(){
 }
 
 function enabledMainPool(){
-  const pool = MAIN_RULES.filter(r => enabledRulesSet.has(r));
-  return pool;
+  return MAIN_RULES.filter(r => enabledRulesSet.has(r));
 }
 
 async function spinMainRule(){
   if (!isHost) return;
-  if (isSpinningMain) return;
+  if (isSpinningMain || mainSpinAnimating) return;
 
   const pool = enabledMainPool();
   if (!pool.length){
@@ -697,19 +689,15 @@ async function spinMainRule(){
     pickedRule: plan.picked
   });
 
-  roomRef.set({
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    state: {
-      pickedRule: plan.picked,
-      slotValues: {}
-    }
-  }, { merge:true }).catch(()=>{});
+  setTimeout(()=>{
+    if (!roomRef) return;
+    roomRef.set({
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      state: { pickedRule: plan.picked, slotValues: {} }
+    }, { merge:true }).catch(()=>{});
+  }, SPIN_MS + 140);
 
   isSpinningMain = false;
-}
-
-function renderPickedRuleOnly(rule){
-  $pickedRule.textContent = rule;
 }
 
 const RULES = {
@@ -754,11 +742,10 @@ const RULES = {
     desc: "팀마다 글자 2개(중복 없이)를 뽑고, 그 글자가 들어간 상위 유닛만 갈 수 있음",
     build: () => {
       const makeTeam = (name, id) => {
-        const groupId = `r_letter_${id}`;
         const { card, values } = createSlotRouletteGroup({
-          groupId,
+          groupId: `r_letter_${id}`,
           title: `${name} 글자 2개`,
-          sub: "글자 2개를 뽑아 그 글자가 포함된 상위만 가능",
+          sub: "글자 2개가 들어간 상위만 가능",
           labels: ["글자1","글자2"],
           items: LETTER_POOL,
           uniqueWithinGroup: true,
@@ -788,7 +775,6 @@ const RULES = {
 
         card.appendChild(note);
         card.appendChild(allowedBox);
-
         $extraArea.appendChild(card);
       };
 
@@ -798,7 +784,7 @@ const RULES = {
   },
 
   "인생의고도전 5+1~10+추가1~10": {
-    desc: "각 개인(빨강/파랑/보라/노랑)이 5~15 숫자를 뽑고, 스토리5 클리어 도박 보상 제일 늦은 1명만 1~10을 한번 더 뽑음",
+    desc: "각 개인(빨강/파랑/보라/노랑)이 5~15 숫자를 뽑고, 스토리5 보상 제일 늦은 1명만 1~10을 한번 더 뽑음",
     build: () => {
       const nums1 = rangeInt(5, 15);
 
@@ -813,7 +799,6 @@ const RULES = {
       });
       $extraArea.appendChild(stage1.card);
 
-      const nums2 = rangeInt(1, 10);
       const { card: stage2Card } = makeCard("2차: 1~10 (제일 늦은 1명만)", "");
       const stage2Wrap = document.createElement("div");
       stage2Card.appendChild(stage2Wrap);
@@ -838,9 +823,10 @@ const RULES = {
           title: "추가 룰렛(1명)",
           sub: ``,
           labels: [target],
-          items: nums2,
+          items: rangeInt(1, 10),
           uniqueWithinGroup: false
         });
+
         stage2Wrap.appendChild(stage2.card);
       }
 
@@ -855,7 +841,7 @@ const RULES = {
       const stage1 = createSlotRouletteGroup({
         groupId: "r_jitsu_stage1",
         title: "1단계: 상위 4개 뽑기",
-        sub: "중복 없이 4개 (각 칸 따로 돌리기)",
+        sub: "중복 없이 4개",
         labels: ["상위1","상위2","상위3","상위4"],
         items: filteredHighUnitsFor("지츠다이스"),
         uniqueWithinGroup: true,
@@ -978,7 +964,6 @@ const RULES = {
   },
 
   "랜덤항법": { desc: "랜덤한 항법 선택(노란색)", build: ()=>{} },
-
   "신비한이세계전": { desc: "반드시 이세계 상위 유닛을 1개 가야함", build: ()=>{} },
 
   "신세계보상치기": {
@@ -1029,7 +1014,6 @@ const RULES = {
           const slotId = `${groupId}:${i}`;
           return {
             slotId,
-            label: c,
             pool: p,
             startIdx: plan.startIdx,
             steps: plan.steps,
@@ -1038,18 +1022,17 @@ const RULES = {
           };
         });
 
-        await emitEvent({
-          type: "batchSpin",
-          groupId,
-          slots
-        });
+        await emitEvent({ type: "batchSpin", slots });
 
-        const slotMap = {};
-        slots.forEach(s => slotMap[s.slotId] = s.picked);
-        roomRef.set({
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          state: { slotValues: slotMap }
-        }, { merge:true }).catch(()=>{});
+        setTimeout(()=>{
+          if (!roomRef) return;
+          const slotMap = {};
+          slots.forEach(s => slotMap[s.slotId] = s.picked);
+          roomRef.set({
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            state: { slotValues: slotMap }
+          }, { merge:true }).catch(()=>{});
+        }, SPIN_MS + 140);
       };
 
       btnRow.appendChild(btn);
@@ -1084,14 +1067,12 @@ const RULES = {
         slotRegistry.set(slotId, {
           setValue: async (picked, spinParams) => {
             val.classList.add("spinning");
-            if (spinParams && spinParams.pool){
-              await spinBySteps(spinParams.pool, {
-                startIdx: spinParams.startIdx,
-                steps: spinParams.steps,
-                durationMs: spinParams.durationMs ?? SPIN_MS,
-                onTick: (t)=> { val.textContent = t; }
-              });
-            }
+            await spinBySteps(spinParams.pool, {
+              startIdx: spinParams.startIdx,
+              steps: spinParams.steps,
+              durationMs: spinParams.durationMs ?? SPIN_MS,
+              onTick: (t)=> { val.textContent = t; }
+            });
             val.textContent = picked ?? "—";
             val.classList.remove("spinning");
           },
@@ -1116,7 +1097,7 @@ const RULES = {
   },
 
   "스토리보상랜덤": {
-    desc: "스토리 10 파괴 후 보상(목박/초월위습/레적선)을 4명에게 배정",
+    desc: "스토리 10을 파괴한 후 나오는 위습으로 목박/초월위습/레적선 중 1개씩 배정",
     build: ()=> {
       const g = createSlotRouletteGroup({
         groupId: "r_story_reward",
@@ -1144,7 +1125,6 @@ function defaultRule(ruleName){
 
 function buildRuleUI(rule){
   clearExtra();
-
   const def = RULES[rule] ?? defaultRule(rule);
   $desc.textContent = def.desc;
   def.build();
@@ -1154,23 +1134,19 @@ async function playMainSpinEvent(ev){
   const pool = ev.pool || [];
   if (!pool.length) return;
 
+  mainSpinAnimating = true;
+
   $pickedRule.classList.add("spinning");
   clearExtra();
   $desc.textContent = "룰 뽑는 중...";
-
-  const startIdx = ev.startIdx ?? 0;
-  const steps = ev.steps ?? Math.max(20, pool.length * 3);
-  const durationMs = ev.durationMs ?? SPIN_MS;
-
-  let currentIdx = startIdx % pool.length;
+  $extraArea.innerHTML = "";
 
   await spinBySteps(pool, {
-    startIdx,
-    steps,
-    durationMs,
-    onTick: (t, idx) => {
+    startIdx: ev.startIdx ?? 0,
+    steps: ev.steps ?? Math.max(20, pool.length * 3),
+    durationMs: ev.durationMs ?? SPIN_MS,
+    onTick: (t) => {
       $pickedRule.textContent = t;
-      currentIdx = idx;
       const activeIdx = MAIN_RULES.indexOf(t);
       if (activeIdx >= 0) setActiveRule(activeIdx);
     }
@@ -1180,16 +1156,10 @@ async function playMainSpinEvent(ev){
 
   const picked = ev.pickedRule || $pickedRule.textContent;
   currentRuleName = picked;
-  renderPickedRuleOnly(picked);
+
   buildRuleUI(picked);
 
-  if (roomRef && roomId){
-    roomRef.get().then((snap)=>{
-      if (!snap.exists) return;
-      const state = (snap.data().state || {});
-      applySlotValues(state.slotValues || {});
-    }).catch(()=>{});
-  }
+  mainSpinAnimating = false;
 }
 
 async function playSlotSpinEvent(ev){
@@ -1197,15 +1167,12 @@ async function playSlotSpinEvent(ev){
   const slot = slotRegistry.get(slotId);
   if (!slot) return;
 
-  const pool = ev.pool || [];
-  const params = {
-    pool,
+  await slot.setValue(ev.picked, {
+    pool: ev.pool || [],
     startIdx: ev.startIdx ?? 0,
-    steps: ev.steps ?? Math.max(20, pool.length * 3),
+    steps: ev.steps ?? 40,
     durationMs: ev.durationMs ?? SPIN_MS
-  };
-
-  await slot.setValue(ev.picked, params);
+  });
 
   const parts = String(slotId).split(":");
   if (parts.length === 2){
@@ -1231,21 +1198,95 @@ async function playBatchSpinEvent(ev){
       steps: s.steps,
       durationMs: s.durationMs ?? SPIN_MS
     });
-
-    const parts = String(s.slotId).split(":");
-    if (parts.length === 2){
-      const gid = parts[0];
-      const idx = Number(parts[1]);
-      const g = groupNotifyRegistry.get(gid);
-      if (g && !Number.isNaN(idx)){
-        g.values[idx] = s.picked;
-        g.notify();
-      }
-    }
   }
 }
 
-// ===== init =====
+async function createRoom(){
+  await ensureAuth();
+  saveNick();
+
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  async function gen(){
+    let code = "";
+    for (let i=0; i<6; i++) code += alphabet[Math.floor(Math.random()*alphabet.length)];
+    return code;
+  }
+
+  for (let attempt=0; attempt<8; attempt++){
+    const code = await gen();
+    const ref = db.collection("rooms").doc(code);
+    const snap = await ref.get();
+    if (snap.exists) continue;
+
+    await ref.set({
+      hostUid: uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      closed: false,
+      closedMsg: "",
+      hostPing: firebase.firestore.FieldValue.serverTimestamp(),
+      enabledRules: [...MAIN_RULES],
+      state: { pickedRule: null, slotValues: {} }
+    });
+
+    await enterRoom(code);
+    return;
+  }
+
+  $lobbyInfo.textContent = "방 생성 실패. 다시 시도해주세요.";
+}
+
+async function enterRoom(code){
+  await ensureAuth();
+  saveNick();
+
+  const ref = db.collection("rooms").doc(code.toUpperCase().trim());
+  const snap = await ref.get();
+  if (!snap.exists){
+    $joinInfo.textContent = "해당 방이 없습니다.";
+    return;
+  }
+  const data = snap.data();
+  if (data.closed){
+    $joinInfo.textContent = "이미 종료된 방입니다.";
+    return;
+  }
+
+  roomId = ref.id;
+  roomRef = ref;
+
+  showRoom();
+  closeJoinOverlay();
+
+  attachRoomListeners();
+  await upsertMember();
+}
+
+async function leaveRoom({ close = false, silent = false } = {}){
+  if (!roomId){
+    showLobby();
+    return;
+  }
+
+  try{
+    if (close && isHost && roomRef){
+      await roomRef.set({
+        closed: true,
+        closedMsg: "방이 사라졌습니다.",
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge:true });
+
+      await roomRef.delete().catch(()=>{});
+    }
+  }catch(e){}
+
+  await deleteMember().catch(()=>{});
+
+  detachRoom();
+  if (!silent) toast("나왔습니다.");
+  showLobby();
+}
+
 async function init(){
   await ensureAuth();
 
@@ -1271,7 +1312,6 @@ async function init(){
   $openJoinBtn.addEventListener("click", openJoinOverlay);
 
   $closeJoinBtn.addEventListener("click", closeJoinOverlay);
-  $closeJoinX.addEventListener("click", closeJoinOverlay);
 
   $joinOverlay.addEventListener("click", (e)=>{
     if (e.target === $joinOverlay) closeJoinOverlay();
@@ -1294,12 +1334,17 @@ async function init(){
   $copyRoomCodeBtn.addEventListener("click", async ()=>{
     if (!roomId) return;
     const ok = await copyText(roomId);
-    $lobbyInfo.textContent = ok ? "방 코드가 복사되었습니다." : "복사 실패(브라우저 권한 확인)";
+    if (ok) toast("복사 완료");
+    else toast("복사 실패(브라우저 권한 확인)");
   });
 
   $leaveRoomBtn.addEventListener("click", async ()=>{
     if (!roomId) return;
     await leaveRoom({ close: isHost });
+  });
+
+  $nickInput.addEventListener("input", ()=>{
+    saveNick();
   });
 
   showLobby();
