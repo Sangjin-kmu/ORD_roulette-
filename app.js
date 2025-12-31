@@ -27,6 +27,7 @@ let mainIndex = 0;
 let isSpinningMain = false;
 let hasPickedMain = false;
 
+let RULE_ENABLED = {};
 
 const SPIN_MS = 1500;
 const MIN_DELAY = 18;
@@ -40,6 +41,25 @@ function clearExtra(){ $extraArea.innerHTML = ""; }
 function setActiveRule(idx){
   mainLis.forEach((li, i) => li.classList.toggle("active", i === idx));
 }
+
+function getEnabledRules(){
+  return MAIN_RULES.filter(r => RULE_ENABLED[r] !== false);
+}
+
+function updateEnabledUI(){
+  const enabledCount = getEnabledRules().length;
+  $ruleCount.textContent = String(enabledCount);
+
+  if (!isSpinningMain) $spinMainBtn.disabled = enabledCount === 0;
+
+  if (enabledCount === 0){
+    $pickedRule.textContent = "룰을 선택하세요";
+    $desc.textContent = "전체 룰 목록에서 최소 1개 이상 체크해야 뽑을 수 있어요.";
+    clearExtra();
+    setActiveRule(-1);
+  }
+}
+
 
 function rangeInt(min, max){
   const out = [];
@@ -639,19 +659,47 @@ function defaultRule(ruleName){
 
 function renderRuleList(){
   $ruleList.innerHTML = "";
+  RULE_ENABLED = {};
+
   mainLis = MAIN_RULES.map((r) => {
+    RULE_ENABLED[r] = true;
+
     const li = document.createElement("li");
-    li.textContent = r;
+
+    const label = document.createElement("label");
+    label.style.display = "flex";
+    label.style.alignItems = "center";
+    label.style.gap = "8px";
+    label.style.cursor = "pointer";
+
+    const chk = document.createElement("input");
+    chk.type = "checkbox";
+    chk.checked = true;
+
+    chk.onchange = () => {
+      RULE_ENABLED[r] = chk.checked;
+      updateEnabledUI();
+    };
+
+    const txt = document.createElement("span");
+    txt.textContent = r;
+
+    label.appendChild(chk);
+    label.appendChild(txt);
+    li.appendChild(label);
+
     $ruleList.appendChild(li);
     return li;
   });
 
-  $ruleCount.textContent = String(MAIN_RULES.length);
-
-  mainIndex = 0;
   setActiveRule(-1);
   $pickedRule.textContent = "룰을 뽑아주세요";
+  $desc.textContent = "아래 '룰 뽑기' 버튼을 눌러 시작하세요.";
+  clearExtra();
+
+  updateEnabledUI();
 }
+
 
 function toggleRuleList(){
   const open = !$ruleListWrap.classList.contains("hidden");
@@ -665,15 +713,16 @@ function toggleRuleList(){
 }
 
 async function spinMainRule(){
-  if (isSpinningMain || MAIN_RULES.length === 0) return;
-  hasPickedMain = true;
+  const pool = getEnabledRules();
+  if (isSpinningMain || pool.length === 0) return;
+
   isSpinningMain = true;
   $spinMainBtn.disabled = true;
   $pickedRule.classList.add("spinning");
 
   clearExtra();
 
-  const picked = await spinPickOne(MAIN_RULES, {
+  const picked = await spinPickOne(pool, {
     onTick: (t) => {
       const idx = MAIN_RULES.indexOf(t);
       if (idx >= 0) setActiveRule(idx);
@@ -683,15 +732,16 @@ async function spinMainRule(){
 
   $pickedRule.classList.remove("spinning");
 
-  const rule = picked ?? MAIN_RULES[mainIndex];
+  const rule = picked;
   const def = RULES[rule] ?? defaultRule(rule);
 
   $desc.textContent = def.desc;
   def.build();
 
-  $spinMainBtn.disabled = false;
   isSpinningMain = false;
+  updateEnabledUI();
 }
+
 
 async function init(){
   $toggleRulesBtn.addEventListener("click", toggleRuleList);
