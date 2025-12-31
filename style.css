@@ -17,6 +17,8 @@ body{
   backdrop-filter: blur(14px);
 }
 
+.hidden{ display:none !important; }
+
 .mainBox{
   display:flex; flex-direction:column; align-items:center; gap: 12px;
 }
@@ -70,11 +72,15 @@ body{
   border-radius: 16px;
   padding: 14px 16px;
 }
-.ruleList ul{ margin:0; padding:0; list-style:none; }
-.ruleList li{ margin: 8px 0; color: rgba(255,255,255,0.92); display:flex; align-items:center; gap: 10px; }
-.ruleList li.active{ background:#111; padding: 2px 6px; border-radius: 8px; display:inline-flex; }
-
-.hidden{ display:none !important; }
+.ruleList ul{ margin:0; padding-left: 18px; }
+.ruleList li{
+  margin: 8px 0;
+  color: rgba(255,255,255,0.92);
+  display:flex;
+  align-items:center;
+  gap: 10px;
+}
+.ruleList li.active{ background:#111; padding: 2px 6px; border-radius: 8px; display:inline-block; }
 
 .hr{ height: 1px; background: rgba(255,255,255,0.14); margin: 18px 0; }
 
@@ -85,6 +91,7 @@ body{
   border-radius: 16px;
   padding: 12px 14px;
   color: rgba(255,255,255,0.92);
+  white-space: pre-line;
 }
 
 .stack{ display:flex; flex-direction:column; gap: 12px; margin-top: 10px; }
@@ -152,167 +159,10 @@ body{
   color: rgba(255,255,255,0.85);
 }
 
-.table{ width: 100%; border-collapse: collapse; margin-top: 8px; }
-.table th, .table td{
-  border-bottom: 1px solid rgba(255,255,255,0.12);
-  padding: 8px 6px;
-  text-align:left;
-  font-size: 13px;
-}
-.table th{ color: rgba(255,255,255,0.85); }
-
-.overlay{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.60);
+.btnRow{
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.overlayCard{
-  position: relative;
-  width: min(520px, 92vw);
-  padding: 20px;
-  border-radius: 16px;
-  background: rgba(255,255,255,0.10);
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 24px 80px rgba(0,0,0,0.35);
-  text-align: center;
-  backdrop-filter: blur(14px);
-}
-
-.overlayTitle{
-  font-size: 22px;
-  font-weight: 800;
-  margin-bottom: 10px;
-}
-
-.overlaySub{
-  opacity: 0.85;
-  margin-bottom: 16px;
-}
-
-.overlayClose{
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(0,0,0,0.16);
-  color: rgba(255,255,255,0.9);
-  cursor: pointer;
-  font-weight: 900;
-}
-
-.overlayClose:hover{
-  background: rgba(255,255,255,0.10);
-}
-
-/* ===== 로비(첫 화면) ===== */
-.lobby{
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  min-height: 520px;
-}
-
-.lobbyHero{
-  width: min(760px, 96%);
-  padding: 28px 22px;
-  border-radius: 24px;
-  border: 1px solid rgba(255,255,255,0.14);
-  background: rgba(0,0,0,0.12);
-  box-shadow: 0 20px 70px rgba(0,0,0,0.25);
-  text-align:center;
-}
-
-.lobbyTitle{
-  font-size: 24px;
-  font-weight: 900;
-  letter-spacing: -0.2px;
-}
-
-.lobbySub{
-  margin-top: 8px;
-  color: rgba(255,255,255,0.82);
-  font-size: 14px;
-}
-
-.heroBtns{
-  margin-top: 18px;
-  display:flex;
-  gap: 12px;
-  justify-content:center;
-  flex-wrap: wrap;
-}
-
-/* ✅ 버튼: 과하게 화려하지 않게 */
-.btnHero{
-  border: 1px solid rgba(255,255,255,0.22);
-  background: rgba(255,255,255,0.10);
-  color: rgba(255,255,255,0.95);
-  cursor: pointer;
-  height: 54px;
-  min-width: 240px;
-  padding: 0 22px;
-  border-radius: 999px;
-  font-size: 16px;
-  font-weight: 900;
-  box-shadow: 0 14px 36px rgba(0,0,0,0.18);
-  transition: transform .08s ease, background .12s ease;
-}
-
-.btnHero:hover{
-  background: rgba(255,255,255,0.16);
-  transform: translateY(-1px);
-}
-
-.btnHero:active{
-  transform: translateY(0px);
-}
-
-.lobbyInfo{
-  margin-top: 16px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.86);
-  background: rgba(0,0,0,0.12);
-  border: 1px solid rgba(255,255,255,0.12);
-  padding: 12px 12px;
-  border-radius: 14px;
-  text-align: left;
-  white-space: pre-line;
-}
-
-/* ===== 참여 입력 UI ===== */
-.joinRow{
-  display:flex;
-  gap: 10px;
-  align-items:center;
-  justify-content:center;
-}
-
-.roomInput{
-  width: 100%;
-  height: 40px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.20);
-  background: rgba(0,0,0,0.14);
-  color: #fff;
-  padding: 0 12px;
-  outline: none;
-}
-
-.roomInput::placeholder{
-  color: rgba(255,255,255,0.55);
-}
-
-.roomInput.big{
-  height: 48px;
-  font-size: 16px;
+  justify-content: flex-end;
+  margin: 8px 0 10px;
 }
 
 .btnSub{
@@ -320,57 +170,231 @@ body{
   padding: 0 12px;
   border-radius: 10px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   border: 1px solid rgba(255,255,255,0.22);
   background: rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.92);
   cursor: pointer;
+  color:#fff;
+  white-space: nowrap;
 }
+.btnSub:hover{ background: rgba(255,255,255,0.10); }
+.btnSub:disabled{ opacity: 0.55; cursor: not-allowed; }
 
-.btnSub.big{
-  height: 48px;
-  padding: 0 16px;
-  border-radius: 12px;
-  font-size: 14px;
-}
-
-.btnSub:hover{
-  background: rgba(255,255,255,0.10);
-}
-
-.btnSub:disabled{
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.joinActions{
+.lobby{
   display:flex;
+  align-items:center;
   justify-content:center;
-  margin-top: 12px;
+  padding: 8px 0 4px;
 }
-
-/* ===== 방 코드 / 나가기 줄 ===== */
-.roomTopRow{
-  width: min(680px, 96%);
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap: 10px;
-  margin-top: 6px;
-  flex-wrap: wrap;
-}
-
-.roomInfoWrap{
-  display:flex;
-  align-items:center;
-  gap: 10px;
-}
-
-.roomInfo{
+.lobbyCard{
+  width: min(640px, 96%);
   background: rgba(0,0,0,0.14);
   border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 18px;
+  padding: 18px;
+  text-align:center;
+}
+.lobbyTitle{
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+.lobbySub{
+  opacity: 0.86;
+  margin-bottom: 14px;
   font-size: 13px;
-  color: rgba(255,255,255,0.90);
+}
+.nickRow{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  justify-content:center;
+  margin: 10px 0 16px;
+}
+.nickLabel{
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 800;
+  width: 60px;
+  text-align:left;
+}
+.nickInput{
+  width: min(320px, 80%);
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  padding: 0 12px;
+  outline: none;
+}
+.nickInput::placeholder{ color: rgba(255,255,255,0.55); }
+
+.bigBtnRow{
+  display:flex;
+  gap: 12px;
+  justify-content:center;
+  flex-wrap:wrap;
+}
+.btnBig{
+  border: 1px solid rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  cursor:pointer;
+  height: 52px;
+  padding: 0 18px;
+  border-radius: 16px;
+  font-size: 16px;
+  font-weight: 900;
+  min-width: 180px;
+}
+.btnBig:hover{ background: rgba(255,255,255,0.12); }
+.btnBig:disabled{ opacity:.6; cursor:not-allowed; }
+.btnGhost{
+  background: rgba(0,0,0,0.12);
+}
+.lobbyInfo{
+  margin-top: 12px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.roomTopRow{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap:wrap;
+}
+.roomCode{
+  margin-right:auto;
+  font-weight: 900;
+  opacity: 0.92;
+}
+
+.membersCard{
+  background: rgba(0,0,0,0.14);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.membersTitle{ font-weight: 900; margin-bottom: 4px; }
+.membersSub{ font-size: 13px; opacity: 0.85; margin-bottom: 8px; }
+.memberList{
+  margin:0;
+  padding-left: 18px;
+}
+.memberList li{
+  margin: 6px 0;
+  opacity: 0.92;
+  font-size: 13px;
+}
+
+.overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.overlayCard{
+  width: min(520px, 92vw);
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(17,17,17,0.92);
+  border: 1px solid rgba(255,255,255,0.15);
+  text-align: center;
+}
+
+.overlayTitle{
+  font-size: 22px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.overlaySub{
+  opacity: 0.82;
+  margin: 10px 0;
+  font-size: 13px;
+}
+
+.joinInput{
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  padding: 0 12px;
+  outline: none;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.overlayBtnRow{
+  display:flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.overlayBtn{
+  flex: 1;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 900;
+  background: rgba(255,255,255,0.12);
+  color:#fff;
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.overlayBtn:hover{ background: rgba(255,255,255,0.16); }
+.overlayBtnGhost{
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.14);
+}
+
+#toastRoot{
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display:flex;
+  flex-direction:column;
+  gap: 8px;
+  pointer-events:none;
+}
+.toast{
+  min-width: 220px;
+  max-width: min(520px, 90vw);
+  background: rgba(0,0,0,0.72);
+  border: 1px solid rgba(255,255,255,0.18);
+  color:#fff;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align:center;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+  opacity: 0;
+  transform: translateY(6px);
+  animation: toastIn .18s ease-out forwards;
+}
+@keyframes toastIn{
+  to { opacity: 1; transform: translateY(0); }
+}
+.toast.out{
+  animation: toastOut .22s ease-in forwards;
+}
+@keyframes toastOut{
+  to { opacity: 0; transform: translateY(6px); }
 }
