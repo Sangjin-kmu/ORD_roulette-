@@ -55,6 +55,7 @@
           <button id="toggleRulesBtn" class="toggle">
             전체 룰 목록 보기 (<span id="ruleCount">0</span>개) <span id="chev">▼</span>
           </button>
+          <button id="openUnitFilterBtn" class="btnSub">유닛 포함 설정</button>
 
           <div id="ruleListWrap" class="ruleList hidden">
             <ul id="ruleList"></ul>
@@ -94,6 +95,49 @@
   </div>
 
   <div id="toastRoot"></div>
+
+  <div id="unitFilterOverlay" class="overlay hidden">
+    <div class="overlayCard ufCard">
+      <div class="overlayTitle">유닛 포함 설정</div>
+      <div class="overlaySub">체크된 유닛만 룰렛에 등장합니다. (방장만 변경 가능)</div>
+
+      <div class="ufSection">
+        <div class="ufHead">
+          <div class="ufTitle">상위 유닛</div>
+          <div class="ufActions">
+            <button id="ufHighAllBtn" class="btnSub" type="button">전체</button>
+          </div>
+        </div>
+        <div id="ufHighList" class="ufList"></div>
+      </div>
+
+      <div class="ufSection">
+        <div class="ufHead">
+          <div class="ufTitle">전설</div>
+          <div class="ufActions">
+            <button id="ufLegendAllBtn" class="btnSub" type="button">전체</button>
+          </div>
+        </div>
+        <div id="ufLegendList" class="ufList"></div>
+      </div>
+
+      <div class="ufSection">
+        <div class="ufHead">
+          <div class="ufTitle">히든</div>
+          <div class="ufActions">
+            <button id="ufHiddenAllBtn" class="btnSub" type="button">전체</button>
+          </div>
+        </div>
+        <div id="ufHiddenList" class="ufList"></div>
+      </div>
+
+      <div class="btnRow">
+        <button id="ufApplyBtn" class="btnSub" type="button">적용</button>
+        <button id="ufCloseBtn" class="btnSub" type="button">닫기</button>
+      </div>
+    </div>
+  </div>
+
 
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
