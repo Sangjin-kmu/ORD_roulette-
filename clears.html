@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>클리어 기록</title>
+  <link rel="stylesheet" href="./style.css" />
+  <style>
+    .clearsPage .panel{
+      max-width: 980px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .clearsPage .panel > *{
+      width: 100%;
+    }
+  </style>
+</head>
+<body class="clearsPage">
+  <header class="top">
+    <div class="title">클리어 기록</div>
+  </header>
+
+  <main class="wrap">
+    <section class="panel">
+      <div class="lobbyCard">
+        <div class="lobbyTitle">클리어 기록 저장</div>
+        <div class="lobbySub">닉네임/사진/내용을 입력하고 저장하세요. (사진은 너무 크면 저장이 안 될 수 있습니다)</div>
+
+        <div class="bigBtnRow">
+          <button id="backToMainBtn" class="btnBig btnGhost" type="button">돌아가기</button>
+        </div>
+
+        <div class="nickRow">
+          <div class="nickLabel">닉네임</div>
+          <input id="clearNickInput" class="nickInput" placeholder="예: sseutte" maxlength="16" />
+        </div>
+
+        <div class="nickRow">
+          <div class="nickLabel">사진</div>
+          <div style="flex:1; display:flex; gap:10px; align-items:center;">
+            <button id="clearPhotoDrop" class="btnSub" type="button">사진 붙여넣기/선택</button>
+            <input id="clearPhotoInput" type="file" accept="image/*" />
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <img id="clearPhotoPreview" style="display:none; width:100%; max-height:260px; object-fit:contain; border-radius:12px; border:1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.18);" alt="preview" />
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="detailTitle">내용</div>
+          <textarea id="clearContent" class="joinInput" style="height:120px; resize:vertical; padding-top:10px; padding-bottom:10px;" placeholder="예) 점수판 / 조합 / 특이사항..." maxlength="2000"></textarea>
+          <div style="margin-top:6px; font-size:12px; opacity:.75; text-align:right;"><span id="clearCount">0</span>/2000</div>
+        </div>
+
+        <div class="overlayBtnRow" style="margin-top:14px;">
+          <button id="saveClearBtn" class="overlayBtn" type="button">저장</button>
+          <button id="clearResetBtn" class="overlayBtn overlayBtnGhost" type="button">초기화</button>
+        </div>
+
+        <div id="clearInfo" class="overlaySub">—</div>
+      </div>
+
+      <div class="hr"></div>
+
+      <section class="detail">
+        <div class="detailTitle">내 클리어 기록</div>
+        <div id="myClearList" class="desc">로딩 중…</div>
+      </section>
+
+      <div class="hr"></div>
+
+      <section class="detail">
+        <div class="detailTitle">전체 클리어 기록</div>
+        <div id="allClearList" class="desc">로딩 중…</div>
+      </section>
+    </section>
+  </main>
+
+  <div id="toastRoot"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+
+  <script src="./clears.js"></script>
+</body>
+</html>
