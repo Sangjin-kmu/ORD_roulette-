@@ -15,6 +15,7 @@ const $roomUI = document.getElementById("roomUI");
 
 const $createRoomBtn = document.getElementById("createRoomBtn");
 const $openJoinBtn = document.getElementById("openJoinBtn");
+const $openClearsBtn = document.getElementById("openClearsBtn");
 const $lobbyInfo = document.getElementById("lobbyInfo");
 
 const $joinOverlay = document.getElementById("joinOverlay");
@@ -25,6 +26,7 @@ const $joinInfo = document.getElementById("joinInfo");
 
 const $roomInfo = document.getElementById("roomInfo");
 const $copyRoomCodeBtn = document.getElementById("copyRoomCodeBtn");
+const $openClearsBtnRoom = document.getElementById("openClearsBtnRoom");
 const $leaveRoomBtn = document.getElementById("leaveRoomBtn");
 
 const $toastRoot = document.getElementById("toastRoot");
@@ -157,6 +159,13 @@ function saveNick(){
   const raw = ($nickInput?.value ?? "").trim();
   localStorage.setItem("ord_nick", raw ? raw.slice(0,16) : "");
 }
+
+function goClearsPage(){
+  const back = roomId ? String(roomId) : "";
+  sessionStorage.setItem("ord_back_room", back);
+  location.href = "./clears.html";
+}
+
 
 function easeOutQuad(t){ return 1 - (1 - t) * (1 - t); }
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
@@ -1809,6 +1818,9 @@ async function init(){
   $createRoomBtn.addEventListener("click", createRoom);
   $openJoinBtn.addEventListener("click", openJoinOverlay);
 
+  if ($openClearsBtn) $openClearsBtn.addEventListener("click", goClearsPage);
+  if ($openClearsBtnRoom) $openClearsBtnRoom.addEventListener("click", goClearsPage);
+
   $closeJoinBtn.addEventListener("click", closeJoinOverlay);
 
   $joinOverlay.addEventListener("click", (e)=>{
@@ -1840,6 +1852,12 @@ async function init(){
   $nickInput.addEventListener("input", ()=>{
     saveNick();
   });
+  const backRoom = sessionStorage.getItem("ord_back_room") || "";
+  sessionStorage.removeItem("ord_back_room");
+  if (backRoom){
+    await enterRoom(backRoom);
+    return;
+  }
 
   showLobby();
 }
